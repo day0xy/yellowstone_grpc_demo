@@ -14,7 +14,26 @@ use yellowstone_grpc_proto::prelude::{
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
-    env_logger::init();
+    // 配置日志格式，使用 UTC+8 时区
+    env_logger::Builder::from_default_env()
+        .format(|buf, record| {
+            use std::io::Write;
+            use chrono::{DateTime, Utc, FixedOffset};
+            
+            let utc_time: DateTime<Utc> = Utc::now();
+            let offset = FixedOffset::east_opt(8 * 3600).unwrap(); // UTC+8
+            let local_time = utc_time.with_timezone(&offset);
+            
+            writeln!(
+                buf,
+                "[{} {} {}] {}",
+                local_time.format("%Y-%m-%d %H:%M:%S UTC+8"),
+                record.level(),
+                record.target(),
+                record.args()
+            )
+        })
+        .init();
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
 
     let mut client = GeyserGrpcClient::build_from_shared(endpoint)?
