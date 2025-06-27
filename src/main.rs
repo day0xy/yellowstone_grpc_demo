@@ -1,14 +1,21 @@
+mod client;
+mod filters;
+mod handles;
+mod types;
+mod utils;
+
 use dotenvy::dotenv;
 use futures::{sink::SinkExt, stream::StreamExt};
 use log::info;
 use std::env;
 use tokio::time::{Duration, interval};
-use yellowstone_grpc_client::ClientTlsConfig;
-use yellowstone_grpc_client::GeyserGrpcClient;
+
 use yellowstone_grpc_proto::prelude::{
     CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing,
     SubscribeUpdatePong, SubscribeUpdateSlot, subscribe_update::UpdateOneof,
 };
+
+use client::connection::GrpcClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -30,30 +37,27 @@ async fn main() -> anyhow::Result<()> {
             )
         })
         .init();
+
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
-
-    let mut client = GeyserGrpcClient::build_from_shared(endpoint)?
-        .tls_config(ClientTlsConfig::new().with_native_roots())?
-        .connect()
-        .await?;
-
+    let grpc_client = GrpcClient::new(endpoint, None);
+    let mut client = grpc_client.build_client().await?;
     let (mut subscribe_tx, mut stream) = client.subscribe().await?;
+
+    let subscribe_request_filter_slot = SubscribeRequest {
+        slots: maplit::hashmap! {
+            "".to_owned() => SubscribeRequestFilterSlots{
+                filter_by_commitment:Some(true),
+                interslot_updates:Some(false),
+            }
+
+        },
+        commitment: Some(CommitmentLevel::Processed as i32),
+        ..Default::default()
+    };
 
     futures::try_join!(
         async move {
-            subscribe_tx
-                .send(SubscribeRequest {
-                    slots: maplit::hashmap! {
-                        "".to_owned() => SubscribeRequestFilterSlots{
-                            filter_by_commitment:Some(true),
-                            interslot_updates:Some(false),
-                        }
-
-                    },
-                    commitment: Some(CommitmentLevel::Processed as i32),
-                    ..Default::default()
-                })
-                .await?;
+            subscribe_tx.send(subscribe_request_filter_slot).await?;
 
             let mut timer = interval(Duration::from_secs(3));
             let mut id = 0;
