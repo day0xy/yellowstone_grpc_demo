@@ -3,7 +3,8 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use log::info;
 use std::env;
 use tokio::time::{Duration, interval};
-use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
+use yellowstone_grpc_client::ClientTlsConfig;
+use yellowstone_grpc_client::GeyserGrpcClient;
 use yellowstone_grpc_proto::prelude::{
     CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing,
     SubscribeUpdatePong, SubscribeUpdateSlot, subscribe_update::UpdateOneof,
@@ -12,6 +13,7 @@ use yellowstone_grpc_proto::prelude::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
+
     env_logger::init();
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
 
