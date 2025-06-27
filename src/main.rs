@@ -14,20 +14,16 @@ use yellowstone_grpc_proto::prelude::{
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
-    // 配置日志格式，使用 UTC+8 时区
+    // 配置日志格式，使用本地时区（最快方案）
     env_logger::Builder::from_default_env()
         .format(|buf, record| {
+            use chrono::Local;
             use std::io::Write;
-            use chrono::{DateTime, Utc, FixedOffset};
-            
-            let utc_time: DateTime<Utc> = Utc::now();
-            let offset = FixedOffset::east_opt(8 * 3600).unwrap(); // UTC+8
-            let local_time = utc_time.with_timezone(&offset);
-            
+
             writeln!(
                 buf,
                 "[{} {} {}] {}",
-                local_time.format("%Y-%m-%d %H:%M:%S UTC+8"),
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
                 record.level(),
                 record.target(),
                 record.args()
