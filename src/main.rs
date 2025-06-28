@@ -4,18 +4,21 @@ mod handles;
 mod types;
 mod utils;
 
+use chrono::Local;
 use dotenvy::dotenv;
 use futures::{sink::SinkExt, stream::StreamExt};
 use log::info;
 use std::{collections::HashMap, env};
 use tokio::time::{Duration, interval};
 
+use solana_sdk::{program_pack::Pack, pubkey::Pubkey, signature::Signature};
 use yellowstone_grpc_proto::prelude::{
     CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing,
     SubscribeUpdatePong, SubscribeUpdateSlot, subscribe_update::UpdateOneof,
 };
 
 use client::connection::GrpcClient;
+use filters::filter_account::monitor_wallet_3z;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -40,59 +43,47 @@ async fn main() -> anyhow::Result<()> {
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
     let grpc = GrpcClient::new(endpoint, None);
     let mut client = grpc.build_client().await?;
-    let (mut subscribe_tx, mut stream) = client.subscribe().await?;
+    let request = monitor_wallet_3z();
 
-    let subscribe_request_filter_slot = SubscribeRequest {
-        slots: HashMap::from([(
-            "client".to_string(),
-            SubscribeRequestFilterSlots {
-                filter_by_commitment: Some(true),
-                interslot_updates: Some(false),
-            },
-        )]),
-        commitment: Some(CommitmentLevel::Processed as i32),
-        ..Default::default()
-    };
+    let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(request)).await?;
 
-    futures::try_join!(
-        async move {
-            subscribe_tx.send(subscribe_request_filter_slot).await?;
+    while let Some(message) = stream.next().await {
+        match message?.update_oneof.expect("invalid message") {
+            UpdateOneof::Account(subscribe_account) => {
+                if let Some(account) = subscribe_account.account {
+                    info!("account: {:#?}", account);
+                    let account_pubkey = Pubkey::try_from(account.pubkey.as_slice())?;
 
-            let mut timer = interval(Duration::from_secs(3));
-            let mut id = 0;
-            loop {
-                timer.tick().await;
-                id += 1;
-                subscribe_tx
-                    .send(SubscribeRequest {
-                        ping: Some(SubscribeRequestPing { id }),
-                        ..Default::default()
-                    })
-                    .await?;
-            }
+                    info!("account_pubkey: {:#?}", account_pubkey);
 
-            #[allow(unreachable_code)]
-            Ok::<(), anyhow::Error>(())
-        },
-        async move {
-            while let Some(message) = stream.next().await {
-                match message?.update_oneof.expect("valid message") {
-                    UpdateOneof::Slot(SubscribeUpdateSlot { slot, .. }) => {
-                        info!("slog received {slot}")
-                    }
-                    UpdateOneof::Ping(_msg) => {
-                        info!("ping received!")
-                    }
-                    UpdateOneof::Pong(SubscribeUpdatePong { id }) => {
-                        info!("pong received id${id}")
-                    }
-                    msg => anyhow::bail!("receive unexpected message: {msg:?}"),
+                    let owner = Pubkey::try_from(account.owner.as_slice())?;
+                    info!("owner: {:#?}", owner);
+
+                    let account_signture = Signature::try_from(account.txn_signature())?;
+                    let account_info = spl_token::state::Account::unpack(&account.data)?;
+
+                    info!("account_signture: {:#?}", account_signture);
+                    info!("account_info: {:#?}", account_info);
                 }
             }
-
-            Ok::<(), anyhow::Error>(())
+            UpdateOneof::Slot(SubscribeUpdateSlot { slot, .. }) => {
+                info!("slog received {slot}")
+            }
+            UpdateOneof::Ping(_) => {
+                let _ = subscribe_tx
+                    .send(SubscribeRequest {
+                        ping: Some(SubscribeRequestPing { id: 1 }),
+                        ..Default::default()
+                    })
+                    .await;
+                info!("service is ping: {:#?}", Local::now());
+            }
+            UpdateOneof::Pong(SubscribeUpdatePong { id }) => {
+                info!("pong received id${id}")
+            }
+            msg => anyhow::bail!("receive unexpected message: {msg:?}"),
         }
-    )?;
+    }
 
-    Ok(())
+    Ok::<(), anyhow::Error>(())
 }
