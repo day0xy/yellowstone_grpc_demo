@@ -23,7 +23,7 @@ use client::connection::GrpcClient;
 
 use filters::filter_account::new_filter_accounts;
 use filters::filter_transaction::new_filter_transactions;
-use utils::format::create_pretty_transaction;
+use utils::format::{create_pretty_account, create_pretty_transaction};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -57,12 +57,17 @@ async fn main() -> anyhow::Result<()> {
 
     while let Some(message) = stream.next().await {
         match message?.update_oneof.expect("invalid message") {
-            UpdateOneof::Account(subscribe_account) => {
-                if let Some(account) = subscribe_account.account {
-                    info!("account lamports: {}", account.lamports);
-                    let account_pubkey = Pubkey::try_from(account.pubkey.as_slice())?;
-                    info!("account_pubkey: {:#?}", account_pubkey);
-                }
+            UpdateOneof::Account(msg) => {
+                let account = msg
+                    .account
+                    .ok_or(anyhow::anyhow!("no account in the message"))?;
+                let mut value = create_pretty_account(account)?;
+                value["isStartup"] = json!(msg.is_startup);
+                value["slot"] = json!(msg.slot);
+                info!(
+                    "Receive Account: {}",
+                    serde_json::to_string(&value).expect("json serialization failed")
+                );
             }
             UpdateOneof::Transaction(msg) => {
                 let tx = msg
