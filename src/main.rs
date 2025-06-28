@@ -4,37 +4,43 @@ mod handles;
 mod types;
 mod utils;
 
-use chrono::Local;
+use chrono::{Local, Utc};
 use dotenvy::dotenv;
 use futures::{sink::SinkExt, stream::StreamExt};
 use log::info;
+use serde_json::{Value, json};
+use std::io::Write;
 use std::{collections::HashMap, env};
 use tokio::time::{Duration, interval};
 
-use solana_sdk::{program_pack::Pack, pubkey::Pubkey, signature::Signature};
+use solana_sdk::pubkey::Pubkey;
 use yellowstone_grpc_proto::prelude::{
-    CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing,
-    SubscribeUpdatePong, SubscribeUpdateSlot, subscribe_update::UpdateOneof,
+    CommitmentLevel, SubscribeRequest, SubscribeRequestPing, SubscribeUpdatePong,
+    SubscribeUpdateSlot, subscribe_update::UpdateOneof,
 };
 
 use client::connection::GrpcClient;
-use filters::filter_account::monitor_wallet_3z;
+
+use filters::filter_account::new_filter_accounts;
+use filters::filter_transaction::new_filter_transactions;
+use utils::format::create_pretty_transaction;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
     env_logger::Builder::from_default_env()
-        .format(|buf, record| {
-            use chrono::Local;
-            use std::io::Write;
+        .format(move |buf, record| {
+            // let time_str = Local::now().format("%Y-%m-%d %H:%M:%S UTC+8").to_string();
+
+            let time_str = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
             writeln!(
                 buf,
                 "[{} {} {}] {}",
-                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                time_str,
                 record.level(),
-                record.target(),
+                record.file().unwrap_or("unknown"),
                 record.args()
             )
         })
@@ -42,8 +48,10 @@ async fn main() -> anyhow::Result<()> {
 
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
     let grpc = GrpcClient::new(endpoint, None);
+    let account_include = vec!["3Z19SwGej4xwKh9eiHyx3eVWHjBDEgGHeqrKtmhNcxsv".to_string()];
     let mut client = grpc.build_client().await?;
-    let request = monitor_wallet_3z();
+
+    let request = new_filter_transactions(account_include, None, None);
 
     let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(request)).await?;
 
@@ -51,20 +59,21 @@ async fn main() -> anyhow::Result<()> {
         match message?.update_oneof.expect("invalid message") {
             UpdateOneof::Account(subscribe_account) => {
                 if let Some(account) = subscribe_account.account {
-                    info!("account: {:#?}", account);
+                    info!("account lamports: {}", account.lamports);
                     let account_pubkey = Pubkey::try_from(account.pubkey.as_slice())?;
-
                     info!("account_pubkey: {:#?}", account_pubkey);
-
-                    let owner = Pubkey::try_from(account.owner.as_slice())?;
-                    info!("owner: {:#?}", owner);
-
-                    let account_signture = Signature::try_from(account.txn_signature())?;
-                    let account_info = spl_token::state::Account::unpack(&account.data)?;
-
-                    info!("account_signture: {:#?}", account_signture);
-                    info!("account_info: {:#?}", account_info);
                 }
+            }
+            UpdateOneof::Transaction(msg) => {
+                let tx = msg
+                    .transaction
+                    .ok_or(anyhow::anyhow!("no transaction in the message"))?;
+                let mut value = create_pretty_transaction(tx)?;
+                value["slot"] = json!(msg.slot);
+                info!(
+                    "Receive transaction: {}",
+                    serde_json::to_string(&value).expect("json serialization failed")
+                );
             }
             UpdateOneof::Slot(SubscribeUpdateSlot { slot, .. }) => {
                 info!("slog received {slot}")
@@ -76,7 +85,8 @@ async fn main() -> anyhow::Result<()> {
                         ..Default::default()
                     })
                     .await;
-                info!("service is ping: {:#?}", Local::now());
+                // info!("service is ping: {:#?}", Local::now());
+                info!("service is ping");
             }
             UpdateOneof::Pong(SubscribeUpdatePong { id }) => {
                 info!("pong received id${id}")
