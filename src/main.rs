@@ -7,7 +7,7 @@ mod utils;
 use dotenvy::dotenv;
 use futures::{sink::SinkExt, stream::StreamExt};
 use log::info;
-use std::env;
+use std::{collections::HashMap, env};
 use tokio::time::{Duration, interval};
 
 use yellowstone_grpc_proto::prelude::{
@@ -21,7 +21,6 @@ use client::connection::GrpcClient;
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
-    // 配置日志格式，使用本地时区（最快方案）
     env_logger::Builder::from_default_env()
         .format(|buf, record| {
             use chrono::Local;
@@ -39,18 +38,18 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
-    let grpc_client = GrpcClient::new(endpoint, None);
-    let mut client = grpc_client.build_client().await?;
+    let grpc = GrpcClient::new(endpoint, None);
+    let mut client = grpc.build_client().await?;
     let (mut subscribe_tx, mut stream) = client.subscribe().await?;
 
     let subscribe_request_filter_slot = SubscribeRequest {
-        slots: maplit::hashmap! {
-            "".to_owned() => SubscribeRequestFilterSlots{
-                filter_by_commitment:Some(true),
-                interslot_updates:Some(false),
-            }
-
-        },
+        slots: HashMap::from([(
+            "client".to_string(),
+            SubscribeRequestFilterSlots {
+                filter_by_commitment: Some(true),
+                interslot_updates: Some(false),
+            },
+        )]),
         commitment: Some(CommitmentLevel::Processed as i32),
         ..Default::default()
     };
