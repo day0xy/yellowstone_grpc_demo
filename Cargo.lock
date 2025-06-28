@@ -2438,12 +2438,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
-name = "maplit"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
-
-[[package]]
 name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4202,9 +4196,9 @@ dependencies = [
 
 [[package]]
 name = "solana-curve25519"
-version = "2.3.1"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2b575bfa3a3775e4201cd5179d4d390a056b8dc691a3df8ac754e8d7e629454"
+checksum = "10aa190d9f47432e255edd9aaddd21aa78c31be0e639c8463427d0fe5e6919a0"
 dependencies = [
  "bytemuck",
  "bytemuck_derive",
@@ -6003,9 +5997,9 @@ dependencies = [
 
 [[package]]
 name = "solana-zk-sdk"
-version = "2.3.1"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fb02d3ce872d534e72e1c6c1439e94d0de5cf9fc9477d4dfd99e106530a11be"
+checksum = "1956de8311683b1adef202afee3b49d90d476505db47c979511dc53436cf640c"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",
@@ -7699,7 +7693,6 @@ dependencies = [
  "env_logger 0.11.8",
  "futures",
  "log",
- "maplit",
  "solana-client",
  "solana-sdk",
  "tokio",
