@@ -24,9 +24,7 @@ use yellowstone_grpc_proto::{
 };
 
 use client::connection::GrpcClient;
-
-use filters::filter_account::new_filter_accounts;
-use filters::filter_transaction::new_filter_transactions;
+use filters::{new_filter_accounts, new_filter_transactions};
 use utils::format::{create_pretty_account, create_pretty_transaction};
 
 #[tokio::main]
@@ -55,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
     let account_include = vec!["39H3DGBpHpffjTuwQDR9yv9AgbK4U4hesLdsVZ9yDDc9".to_string()];
     let mut client = grpc.build_client().await?;
 
-    // let request = new_filter_transactions(account_include, None, None);
+    let request = new_filter_transactions(account_include, None, None);
     // let request = new_filter_accounts(Some(account_include), None);
 
     //test slot filter
