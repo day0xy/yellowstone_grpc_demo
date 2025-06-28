@@ -20,12 +20,3 @@ pub fn new_filter_accounts(
         ..Default::default()
     }
 }
-
-pub fn monitor_wallet_3z() -> SubscribeRequest {
-    new_filter_accounts(
-        Some(vec![
-            "3Z19SwGej4xwKh9eiHyx3eVWHjBDEgGHeqrKtmhNcxsv".to_string(),
-        ]),
-        None,
-    )
-}

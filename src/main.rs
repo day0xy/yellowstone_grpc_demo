@@ -4,6 +4,7 @@ mod handles;
 mod types;
 mod utils;
 
+use anyhow::Context;
 use chrono::{Local, Utc};
 use dotenvy::dotenv;
 use futures::{sink::SinkExt, stream::StreamExt};
@@ -14,9 +15,12 @@ use std::{collections::HashMap, env};
 use tokio::time::{Duration, interval};
 
 use solana_sdk::pubkey::Pubkey;
-use yellowstone_grpc_proto::prelude::{
-    CommitmentLevel, SubscribeRequest, SubscribeRequestPing, SubscribeUpdatePong,
-    SubscribeUpdateSlot, subscribe_update::UpdateOneof,
+use yellowstone_grpc_proto::{
+    geyser::SlotStatus,
+    prelude::{
+        CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing,
+        SubscribeUpdatePong, SubscribeUpdateSlot, subscribe_update::UpdateOneof,
+    },
 };
 
 use client::connection::GrpcClient;
@@ -48,10 +52,24 @@ async fn main() -> anyhow::Result<()> {
 
     let endpoint = env::var("YELLOWSTONE_GRPC_URL")?;
     let grpc = GrpcClient::new(endpoint, None);
-    let account_include = vec!["3Z19SwGej4xwKh9eiHyx3eVWHjBDEgGHeqrKtmhNcxsv".to_string()];
+    let account_include = vec!["39H3DGBpHpffjTuwQDR9yv9AgbK4U4hesLdsVZ9yDDc9".to_string()];
     let mut client = grpc.build_client().await?;
 
-    let request = new_filter_transactions(account_include, None, None);
+    // let request = new_filter_transactions(account_include, None, None);
+    // let request = new_filter_accounts(Some(account_include), None);
+
+    //test slot filter
+    // let request = SubscribeRequest {
+    //     slots: HashMap::from([(
+    //         "client".to_string(),
+    //         SubscribeRequestFilterSlots {
+    //             filter_by_commitment: Some(true),
+    //             interslot_updates: Some(false),
+    //         },
+    //     )]),
+    //     commitment: Some(CommitmentLevel::Processed as i32),
+    //     ..Default::default()
+    // };
 
     let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(request)).await?;
 
@@ -80,8 +98,19 @@ async fn main() -> anyhow::Result<()> {
                     serde_json::to_string(&value).expect("json serialization failed")
                 );
             }
-            UpdateOneof::Slot(SubscribeUpdateSlot { slot, .. }) => {
-                info!("slog received {slot}")
+            UpdateOneof::Slot(msg) => {
+                let status =
+                    SlotStatus::try_from(msg.status).context("failed to decode commitment")?;
+                let value = json!({
+                    "slot": msg.slot,
+                    "parent": msg.parent,
+                    "status": status.as_str_name(),
+                    "deadError": msg.dead_error,
+                });
+                info!(
+                    "Receive Slot: {}",
+                    serde_json::to_string(&value).expect("json serialization failed")
+                );
             }
             UpdateOneof::Ping(_) => {
                 let _ = subscribe_tx
