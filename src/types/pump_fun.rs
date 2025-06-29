@@ -148,7 +148,9 @@ pub trait EventTrait: Sized + std::fmt::Debug {
     fn valid_discrminator(head: &[u8]) -> bool;
 
     fn parse_logs<T: EventTrait + Clone>(logs: &[String]) -> Option<T> {
-        logs.iter().rev().find_map(|log| {
+        // println!("{:?}", logs);
+
+        logs.iter().find_map(|log| {
             let payload = log.strip_prefix(PROGRAM_DATA)?;
             let bytes = general_purpose::STANDARD
                 .decode(payload)
@@ -158,9 +160,12 @@ pub trait EventTrait: Sized + std::fmt::Debug {
             let (discr, rest) = bytes.split_at(8);
             //如果匹配discrminator正确
             if Self::valid_discrminator(discr) {
+                println!("*******************************************************",);
+                println!("匹配成功");
+                println!("*******************************************************",);
                 T::from_bytes(rest).ok()
             } else {
-                // println!("{:?}", discr);
+                // println!("不匹配discrminator {:?}", discr);
                 // println!("{:?}", rest);
                 None
             }
