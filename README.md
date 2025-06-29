@@ -1,3 +1,4 @@
+中文/[English](./README_EN.md)
 ## 项目介绍
 
 一个使用 [ yellowstone gRPC](https://github.com/rpcpool/yellowstone-grpc)监控 solana 上合约事件的 rust 项目，解析特定的合约事件(可自行拓展)。
