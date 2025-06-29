@@ -156,9 +156,12 @@ pub trait EventTrait: Sized + std::fmt::Debug {
                 .ok()?;
 
             let (discr, rest) = bytes.split_at(8);
+            //如果匹配discrminator正确
             if Self::valid_discrminator(discr) {
                 T::from_bytes(rest).ok()
             } else {
+                // println!("{:?}", discr);
+                // println!("{:?}", rest);
                 None
             }
         })
