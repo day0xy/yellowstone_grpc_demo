@@ -150,7 +150,7 @@ pub trait EventTrait: Sized + std::fmt::Debug {
     fn parse_logs<T: EventTrait + Clone>(logs: &[String]) -> Option<T> {
         // println!("{:?}", logs);
 
-        logs.iter().find_map(|log| {
+        logs.iter().rev().find_map(|log| {
             let payload = log.strip_prefix(PROGRAM_DATA)?;
             let bytes = general_purpose::STANDARD
                 .decode(payload)
@@ -165,7 +165,7 @@ pub trait EventTrait: Sized + std::fmt::Debug {
                 println!("*******************************************************",);
                 T::from_bytes(rest).ok()
             } else {
-                // println!("不匹配discrminator {:?}", discr);
+                // println!("匹配失败discrminator {:?}", discr);
                 // println!("{:?}", rest);
                 None
             }
