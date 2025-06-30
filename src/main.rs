@@ -90,7 +90,8 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(meta) = msg.transaction.clone().and_then(|t| t.meta) {
                     let logs = meta.log_messages;
                     if let Some(create_event) = CreateEvent::parse_logs::<CreateEvent>(&logs) {
-                        info!("detect creating token: {:#?}", create_event);
+                        println!("{:?}", create_event);
+                        // info!("detect creating token: {:?}", create_event);
                     };
                 }
 
